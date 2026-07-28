@@ -124,7 +124,7 @@ Source, the Markdown write-ups, and the servers live on [GitHub](https://github.
 
 ### Interactive playground — coming soon
 
-An interactive playground is in the works: pick one of the six demo tools, fill its form, and validate against its schema, with a panel showing how each model + provider handled that `inputSchema`. It isn't published yet.
+An interactive playground is in the works: pick one of the six demo tools, fill its form, and validate against its schema, with a panel showing how each model + provider handled that `inputSchema`. It isn't published yet. Follow [Ola on LinkedIn](https://www.linkedin.com/in/olahungerford/) for updates, more research, and errata.
 
 <!-- Playground published-links section — restore when the playground ships.
 ### Interactive playground
