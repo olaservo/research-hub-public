@@ -302,7 +302,7 @@ function objectNode(schema, root, onChange) {
         const v = field.read();
         if (v !== undefined) out[name] = v;
       }
-      return Object.keys(out).length || required.size ? out : out;
+      return out;
     },
   };
 }

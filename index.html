@@ -14,7 +14,7 @@
          deferred theme-switcher.js below still builds the control. */
       try {
         var t = sessionStorage.getItem('research-hub-theme');
-        if (t && /^(hypercard|craigshouse)$/.test(t)) {
+        if (t && /^(hypercard|craigshouse|tufte)$/.test(t)) {
           document.body.className =
             document.body.className.replace(/\btheme-\w+\b/g, '').trim();
           document.body.classList.add('theme-' + t);
@@ -37,8 +37,33 @@
         <div class="section-head">
           <h2>Research</h2>
         </div>
-        <p class="muted">Write-ups are being prepared and will appear here as
-          they're published.</p>
+        <div class="grid" data-cols="2">
+
+          <article class="card stack" data-gap="sm">
+            <div class="card-head">
+              <div class="card-titles">
+                <h3 class="card-title"><a href="mcp/tool-schemas/index.html">MCP · tool schemas</a></h3>
+                <p class="card-sub">What full JSON Schema 2020-12 unlocks in a tool input</p>
+                <p class="caption">Last updated <time datetime="2026-07-28">2026-07-28</time></p>
+              </div>
+            </div>
+            <p>SEP-2106 made the full 2020-12 vocabulary legal in an MCP tool's
+              <code>inputSchema</code> — <code>oneOf</code>,
+              <code>if</code>/<code>then</code>, <code>prefixItems</code>,
+              <code>$ref</code> and more. Do models and providers actually
+              <strong>honor those keywords</strong> when they emit a tool call?
+              Measured across 24 models and three API arms, with a
+              Hugging Face-ready fidelity dataset. <em>(An interactive
+              playground is coming soon.)</em></p>
+            <div class="cluster" data-gap="xs">
+              <!-- Restore when the playground ships:
+              <a class="button" href="mcp/tool-schemas/playground.html">Open playground</a>
+              -->
+              <a class="button" href="mcp/tool-schemas/index.html">Read the findings</a>
+            </div>
+          </article>
+
+        </div>
       </section>
 
     </main>

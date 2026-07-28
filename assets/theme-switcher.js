@@ -19,7 +19,8 @@
 
   var THEMES = [
     { id: "hypercard",  label: "HyperCard"  },
-    { id: "craigshouse", label: "Craigshouse" }
+    { id: "craigshouse", label: "Craigshouse" },
+    { id: "tufte",       label: "Tufte"       }
   ];
   var KEY = "research-hub-theme";
   var IDS = THEMES.map(function (t) { return t.id; });

@@ -16,7 +16,7 @@ Face Space); the same content renders as Markdown here on GitHub.
 
 ## Research
 
-Write-ups are being prepared and will appear here as they're published.
+- **[MCP · tool schemas](mcp/tool-schemas/)** — what full JSON Schema 2020-12 unlocks in an MCP tool input (SEP-2106), and whether models and providers honor those keywords when they emit a tool call: measured by a 5,040-row fidelity dataset across 24 models and three API arms ([dataset card](mcp/tool-schemas/data/dataset-card.md)). An interactive playground + twin TS/Python demo MCP servers are coming soon.
 
 Whenever we reference or copy content from outside this repo, we cite the original
 source with a link and the author's name.

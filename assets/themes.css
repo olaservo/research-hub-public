@@ -12,17 +12,20 @@
    Apply a theme by putting the class on <body>, e.g. <body class="theme-hypercard">.
    The control in theme-switcher.js toggles between them at runtime.
 
-   Themes: theme-hypercard (default) · theme-craigshouse
+   Themes: theme-hypercard (default) · theme-craigshouse · theme-tufte
    The HyperCard theme comes from everything-else/.inbox/hypercard-revival/.
-   Inspiration: Apple HyperCard (1987, Bill Atkinson) and Craigslist
-   (1995, Craig Newmark) — https://www.craigslist.org/.
+   Inspiration: Apple HyperCard (1987, Bill Atkinson), Craigslist
+   (1995, Craig Newmark) — https://www.craigslist.org/ — and Edward Tufte's
+   print style via Tufte CSS (Dave Liepmann, MIT) —
+   https://github.com/edwardtufte/tufte-css.
    =========================================================================== */
 
 /* All themes: fill the viewport so the themed background reaches the bottom.
    (Birch's <html> keeps its own background: var(--bg); since the theme only
    overrides --bg on <body>, a short page would otherwise show white below.) */
 body.theme-hypercard,
-body.theme-craigshouse {
+body.theme-craigshouse,
+body.theme-tufte {
   min-height: 100vh;
 
   /* Birch's type scale runs small; nudge it up a notch across all themes
@@ -243,6 +246,118 @@ body.theme-craigshouse .button:hover,
 body.theme-craigshouse .btn:hover { background: #e6e6e6; filter: none; }
 
 /* ===========================================================================
+   THEME: TUFTE  —  Edward Tufte's print aesthetic (via Tufte CSS, Dave
+   Liepmann / Edward Tufte, MIT — https://github.com/edwardtufte/tufte-css),
+   prototyped in the mcp/tool-schemas findings-tufte layout experiment.
+   Off-white paper, warm near-black ink, serif throughout, italic unbolded
+   headings, hairline rules, no boxes and no shadows. This is typography +
+   palette only — a token re-skin, not the margin-note layout (that needs
+   structural markup; see the tufterising project).
+   =========================================================================== */
+body.theme-tufte {
+  --bg:            #fffff8;          /* Tufte CSS paper */
+  --surface:       #fffff8;
+  --surface-tint:  #f6f4e8;
+  --surface-warm:  #f6f4e8;
+  --text:          #191919;          /* warm near-black ink */
+  --text-soft:     #464440;
+  --text-muted:    #6b675f;
+  --muted:         #6b675f;
+  --border-color:  #d8d4c8;          /* hairline rule */
+  --accent:        #8f1d1d;          /* restrained dark red, used sparingly */
+  --accent-strong: #6d1414;
+  --danger:        #8f1d1d;
+
+  /* serif everywhere — Birch's body/headings read --font-sans, so both
+     tokens point at the book stack (ET Book if installed, else Palatino) */
+  --font-sans:  "et-book", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --font-serif: "et-book", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+
+  /* print has no rounded corners */
+  --radius-xs: 0; --radius-sm: 0; --radius-md: 0; --radius-lg: 0; --radius-xl: 0;
+
+  /* Tufte runs bigger and airier than Birch — generous, nothing tiny */
+  --text-xs:   14px;
+  --text-sm:   15px;
+  --text-md:   16px;
+  --text-base: 17px;
+  --text-lg:   20px;
+  --leading-body: 1.55;
+
+  background: #fffff8;
+}
+
+/* no card frame: the page is the paper */
+body.theme-tufte .page {
+  background: #fffff8;
+  border: 0;
+  box-shadow: none;
+  padding-inline: var(--page-pad);
+}
+
+/* headings: italic, unbolded, left-set — the Tufte CSS convention */
+body.theme-tufte header { text-align: left; }
+body.theme-tufte h1,
+body.theme-tufte h2,
+body.theme-tufte h3 {
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: 0;
+  color: var(--text);
+}
+body.theme-tufte h1 code,
+body.theme-tufte h2 code,
+body.theme-tufte h3 code { font-style: normal; }
+body.theme-tufte .eyebrow {
+  justify-content: flex-start;
+  font-variant: small-caps;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+}
+body.theme-tufte .lede { text-align: left; font-style: italic; color: var(--text); }
+
+/* links: ink-colored with a quiet underline that darkens on hover —
+   Tufte reserves hue for data, not navigation */
+body.theme-tufte a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--border-color);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+body.theme-tufte a:visited { color: inherit; }
+body.theme-tufte a:hover {
+  color: var(--accent);
+  background: transparent;
+  text-decoration-color: var(--accent);
+}
+
+/* cards + panels: same paper, hairline border, no shadow */
+body.theme-tufte .card,
+body.theme-tufte .panel {
+  background: #fffff8;
+  border: 1px solid var(--border-color);
+  box-shadow: none;
+}
+
+/* buttons: understated bordered text, square, no shadow */
+body.theme-tufte .button,
+body.theme-tufte .btn {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--text-muted);
+  border-radius: 0;
+  box-shadow: none;
+  font-weight: 400;
+}
+body.theme-tufte .button:hover,
+body.theme-tufte .btn:hover {
+  background: #f0eee0;
+  color: var(--text);
+  filter: none;
+}
+
+/* ===========================================================================
    SURVEY VARIANT PALETTES, per theme
    ---------------------------------------------------------------------------
    The client/server surveys colour-code their A/B/C/D groups via --variant-a..d
@@ -264,6 +379,20 @@ body.theme-craigshouse .variants-server {
   --variant-b: #993300;  /* rust   */
   --variant-c: #996600;  /* amber  */
   --variant-d: #993366;  /* plum   */
+}
+
+/* Tufte — muted, ink-adjacent hues; still cool client / warm server */
+body.theme-tufte .variants-client {
+  --variant-a: #3f4c5a;  /* slate     */
+  --variant-b: #4f6a67;  /* sea gray  */
+  --variant-c: #5c5470;  /* plum gray */
+  --variant-d: #59663f;  /* olive     */
+}
+body.theme-tufte .variants-server {
+  --variant-a: #8f1d1d;  /* dark red  */
+  --variant-b: #8a5a2e;  /* umber     */
+  --variant-c: #7a6a33;  /* ochre     */
+  --variant-d: #7d4a5e;  /* mulberry  */
 }
 
 /* A linked card title should wear its theme's heading color, not the link color

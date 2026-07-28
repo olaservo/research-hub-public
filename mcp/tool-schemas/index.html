@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tool schemas — full JSON Schema 2020-12 in MCP tool inputs</title>
+    <link rel="stylesheet" href="../../assets/styles.css">
+    <link rel="stylesheet" href="../../assets/themes.css">
+    <style>
+      /* At-a-glance results grid (static snapshot; the glyph carries the verdict so
+         it reads under the 1-bit theme too, colour is a secondary cue). */
+      .results-grid-wrap { overflow-x: auto; }
+      .results-grid { border-collapse: collapse; font-size: var(--text-base); width: 100%; }
+      /* Model names etc. stay at full cell size — the global code { 0.92em } shrink
+         lands too small under the denser themes (craigshouse maps --text-base to 14px). */
+      .results-grid code { font-size: 1em; }
+      .results-grid th, .results-grid td { padding: 0.3rem 0.55rem; text-align: center; border-bottom: 1px solid var(--border-soft, rgba(128,128,128,.25)); }
+      .results-grid thead th { font-weight: 600; white-space: nowrap; vertical-align: bottom; }
+      .results-grid tbody td:first-child { text-align: left; white-space: nowrap; }
+      .results-grid .pg-cell { font-weight: 400; font-size: 1.05em; }
+      .results-grid .is-honored { color: var(--success, #2e7d32); }
+      .results-grid .is-invalid, .results-grid .is-rejected { color: var(--danger, #c62828); }
+      .results-grid .is-dropped { color: var(--text-soft, #888); }
+      .results-legend { font-size: var(--text-sm); color: var(--text-soft, #888); }
+      /* Cross-host drill-down: reuses .results-grid; percentages (not glyphs), the
+         Model + Keyword columns left-aligned, a rule between model groups. */
+      .crosshost-grid .ch-cell { font-weight: 400; white-space: nowrap; }
+      .crosshost-grid .ch-label { text-align: left; white-space: nowrap; }
+      .crosshost-grid .ch-na, .crosshost-grid .ch-ns { color: var(--text-soft, #888); }
+      .crosshost-grid .ch-modeltop td { border-top: 2px solid var(--border-soft, rgba(128,128,128,.4)); }
+      /* Tufte theme: ink discipline — honored ✓ is the quiet default (faint warm
+         gray), a request-time ⊘ is a deterministic API gate (mid gray), and dark
+         red is reserved for the one true model failure, invalid args ✗. Mirrors
+         the gate-vs-skill split; same page-scoped pattern as the playground's
+         hypercard verdict override. */
+      body.theme-tufte .results-grid .is-honored { color: #b9b4a6; }
+      body.theme-tufte .results-grid .is-rejected { color: #6b675f; }
+      body.theme-tufte .results-grid .is-invalid { color: var(--danger); }
+    </style>
+  </head>
+  <body class="theme-hypercard">
+    <script>
+      /* Pre-paint: apply the session-stored theme before first paint so a page
+         whose default theme differs from the stored choice doesn't flash. The
+         deferred theme-switcher.js below still builds the control. */
+      try {
+        var t = sessionStorage.getItem('research-hub-theme');
+        if (t && /^(hypercard|craigshouse|tufte)$/.test(t)) {
+          document.body.className =
+            document.body.className.replace(/\btheme-\w+\b/g, '').trim();
+          document.body.classList.add('theme-' + t);
+        }
+      } catch (e) {}
+    </script>
+    <main class="page stack" data-gap="lg">
+
+      <header class="stack" data-gap="sm">
+        <p class="muted"><a href="../../index.html">research-hub</a></p>
+        <h1>Measuring tool input schema fidelity</h1>
+        <p class="caption">Last updated <time datetime="2026-07-28">2026-07-28</time></p>
+      </header>
+
+      <p class="lede"><a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/seps/2106-json-schema-2020-12.md">SEP-2106</a>
+        lets an MCP tool's <code>inputSchema</code> and <code>outputSchema</code> use the full <strong>JSON Schema
+        2020-12</strong> vocabulary. Before it, a tool input was limited to
+        <code>type</code> / <code>properties</code> / <code>required</code>; now
+        <code>oneOf</code>, <code>$ref</code>/<code>$defs</code>,
+        <code>if</code>/<code>then</code>, <code>const</code> discriminators and
+        2020-12 tuples (<code>prefixItems</code>) are all legal. This topic shows
+        that capability in action and probes whether a sample of models and providers
+        actually respect those keywords when they generate a tool call.</p>
+
+      <section class="section stack" data-gap="md">
+        <div class="section-head"><h2>What models + providers do with input schemas</h2></div>
+        <p>The grid below includes results from handing each tool's verbatim <code>inputSchema</code>
+          to a selection of models and providers over two buckets: open-weight models via
+          Hugging Face's Inference Providers router (each pinned to one
+          verified serving provider) and closed models via each vendor's own SDK.</p>
+
+        <h3>How to read these results</h3>
+        <ul>
+          <li>A cell counts as 'honored' if the returned arguments both validate against the verbatim schema and respect the demonstrated keyword (such as populating exactly one <code>oneOf</code> branch, handling a 2-element tuple, using the right <code>const</code> discriminator). Percentages are <strong>honored-of-served</strong>: honored trials out of the trials actually served (transport <code>error</code> rows, like rate-limit noise, are excluded from the denominator).</li>
+          <li>A single honored-of-served number pools two different things: whether the provider's API even <em>accepted</em> the schema (a deterministic host gate) and, given acceptance, whether the model filled it out correctly (model skill). So don't rank models by the pooled number: an Anthropic/OpenAI-chat 0.83 represents a deterministic API reject of one keyword, while a lower score elsewhere may be a genuine model failure.</li>
+          <li>Each open-model verdict is specific to a (model × serving host) at a point in time and not 100% exhaustive of all possible hosts and configurations. These results are not meant to be a comprehensive decision guide on which providers to use. They are meant to be illustrative of how schema support varies, and what constraints you may need to consider as an MCP server, framework, or SDK author.</li>
+          <li>Read the rates as upper bounds under favorable phrasing. The default prompts state each task in a single fixed sentence whose values already conform to the schema, and one of them (<code>lookup-record</code>'s "Use whichever single identifier the tool expects") explicitly nudges the expected structure. See "Does coaching the prompt inflate the numbers?" below the results tables for a control comparison with more natural phrasings.</li>
+        </ul>
+
+        <h3>How models handled each keyword</h3>
+        <p>This results table below reports one serving arm per model. For closed vendors, this was the vendor's own API. For open models, this represents a single pinned host.</p>
+        <ul>
+          <li>Native inference APIs were used for closed model examples, and/or models that were not available on Hugging Face Inference Providers (Claude, GPT, Gemini). The OpenAI rows in this table are the <code>/v1/responses</code> arm. (OpenAI recommends this endpoint for function tools.)</li>
+          <li>A sample of open model host providers through Hugging Face Inference were used for all other models. (The results in the table below are from Deepinfra for all open models, except for Inkling and Kimi 3, which were each available from only one host &mdash; Together.)</li>
+        </ul>
+        <p>These results also reflect setting the API parameters to allow for these schema keywords, such as by setting strict mode to 'false' where applicable.</p>
+        <div class="results-grid-wrap">
+          <table class="results-grid">
+              <thead><tr><th>Model</th><th>enums</th><th>top-level oneOf</th><th>const union</th><th>$ref</th><th>if / then</th><th>prefixItems</th></tr></thead>
+              <tbody>
+                <tr><td><code>claude-fable-5</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-rejected" title="rejected">⊘</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>claude-sonnet-5</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-rejected" title="rejected">⊘</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>claude-haiku-4.5</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-rejected" title="rejected">⊘</td><td class="pg-cell is-invalid" title="invalid args">✗</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>claude-opus-4.8</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-rejected" title="rejected">⊘</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>gpt-5.5</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>gpt-5.4</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>gpt-5.4-mini</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>gpt-5.6-sol</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>gpt-5.6-terra</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>gpt-5.6-luna</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>gemini-3.5-flash</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>gemini-3.1-pro</code></td><td class="pg-cell is-invalid" title="invalid args — plain enum fields perfect; returns the title instead of the const on the oneOf/anyOf fields (see below)">✗</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>gemini-3.1-flash-lite</code></td><td class="pg-cell is-invalid" title="invalid args — plain enum fields perfect; returns the title instead of the const on the oneOf/anyOf fields (see below)">✗</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>glm-5.2</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>deepseek-v4-flash</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>kimi-k2.6</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>kimi-k2.7-code</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-dropped" title="mixed — 19/20 honored, 1 invalid">95%</td><td class="pg-cell is-dropped" title="mixed — 17/20 honored, 3 invalid">85%</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-dropped" title="mixed — 16/20 honored, 4 invalid">80%</td></tr>
+                <tr><td><code>kimi-k3</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored — 19/19 served (1 rate-limit error excluded)">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored — Together serves the 2020-12 tuple that Moonshot's own API refuses; see the cross-provider table">✓</td></tr>
+                <tr><td><code>qwen3.6-35b</code></td><td class="pg-cell is-dropped" title="mixed — 18/20 honored, 2 returned no selections at all">90%</td><td class="pg-cell is-invalid" title="invalid args">✗</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>qwen3.5-397b</code></td><td class="pg-cell is-dropped" title="mixed — 19/20 honored, 1 returned no selections at all">95%</td><td class="pg-cell is-invalid" title="invalid args">✗</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>minimax-m3</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-invalid" title="invalid args">✗</td></tr>
+                <tr><td><code>gemma-4-31b</code></td><td class="pg-cell is-dropped" title="mixed — 19/20 honored, 1 returned no selections at all">95%</td><td class="pg-cell is-dropped" title="mixed — 13/20 honored, 7 invalid (and 0/20 without the coached prompt — see the coaching control below)">65%</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>gpt-oss-120b</code></td><td class="pg-cell is-invalid" title="invalid args">✗</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-dropped" title="mixed — 13/20 honored, 7 invalid (30% without the coached prompt — see the coaching control below)">65%</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>inkling</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+              </tbody>
+          </table>
+        </div>
+        <p class="results-legend">Key: <strong>✓</strong> honored on every served trial &nbsp;·&nbsp; <strong>n%</strong> honored on only that share of trials (mixed results, honored-of-served; hover for counts) &nbsp;·&nbsp; <strong>✗</strong> produces invalid args (fails 2020-12 validation) on every served trial &nbsp;·&nbsp; <strong>⊘</strong> rejected (the provider refused the schema at request time).</p>
+        <p>Two of the ✗ cells are attributable to the pinned serving host rather than the model: <code>minimax-m3</code>'s <code>prefixItems</code> fails only on deepinfra (fireworks-ai, novita, and together all serve it at 100% &mdash; see the cross-provider table below), and <code>gpt-oss-120b</code>'s enums failure is host-conditional (novita and scaleway reproduce it; fireworks-ai and together don't). The measured unit for open models is <code>(model &times; serving host)</code>.</p>
+
+        <h3>Comparing OpenAI Chat Completions vs Responses endpoints</h3>
+        <p>I also tested the same OpenAI models on the older <code>/v1/chat/completions</code> endpoint. On the chat-completions endpoint, the top-level <code>oneOf</code> was refused on every tier and both generations of model. The GPT-5.6 rows here were measured with <code>reasoning_effort="none"</code> because chat-completions refuses function tools at any other effort.</p>
+        <div class="results-grid-wrap">
+          <table class="results-grid">
+              <thead><tr><th>Model</th><th>enums</th><th>top-level oneOf</th><th>const union</th><th>$ref</th><th>if / then</th><th>prefixItems</th></tr></thead>
+              <tbody>
+                <tr><td><code>gpt-5.5</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-rejected" title="rejected">⊘</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>gpt-5.4</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-rejected" title="rejected">⊘</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>gpt-5.4-mini</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-rejected" title="rejected">⊘</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>gpt-5.6-sol</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-rejected" title="rejected">⊘</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>gpt-5.6-terra</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-rejected" title="rejected">⊘</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+                <tr><td><code>gpt-5.6-luna</code></td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-rejected" title="rejected">⊘</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td><td class="pg-cell is-honored" title="honored">✓</td></tr>
+              </tbody>
+          </table>
+        </div>
+
+        <h3>Digging deeper into Gemini and enum failures</h3>
+        <p>The example "enums" tool bundles six keywords (<code>enum</code> / <code>oneOf</code> / <code>anyOf</code> / <code>const</code> / <code>title</code> / <code>enumNames</code>). Both Gemini 3.1 models used the three plain-<code>enum</code> fields perfectly, but a follow-up probe (the title-vs-const decomposition in the <a href="https://github.com/olaservo/research-hub-public/blob/main/mcp/tool-schemas/data/dataset-card.md">dataset card</a>'s appendix) found that <code>oneOf</code>/<code>anyOf</code> branch <code>const</code>s don't survive Google's function-declaration path: asked to echo the allowed values, all three Gemini generations quote the display titles and never the consts, and renaming the consts shows even 3.5 Flash is reconstructing the wire values (from <code>default</code> + option order) rather than reading them from the schema. 3.5 Flash reconstructs well enough to score ✓; the 3.1 models echo the title instead.</p>
+
+        <h3>The same model on different providers</h3>
+        <p>As a side experiment, I re-ran the identical schemas on other tool-capable Hugging Face providers, then added Moonshot's own API in order to cover multiple Kimi model versions side by side on the same providers.</p>
+        <p>The <code>kimi-k3</code> row is the sharpest case in this table: the same model and the same six schemas on two delivery paths, and one keyword flips. Moonshot's API refuses the 2020-12 tuple (<code>prefixItems</code> + <code>items: false</code>) at request time, before the model ever sees it; Together serves the identical schema and K3 honors it on every trial. The &#8709; is the endpoint's, not the model's.</p>
+        <div class="results-grid-wrap">
+          <table class="results-grid crosshost-grid">
+              <thead><tr><th>Model</th><th>Keyword</th><th>deepinfra</th><th>fireworks-ai</th><th>novita</th><th>scaleway</th><th>together</th><th>zai-org</th><th>moonshot</th></tr></thead>
+              <tbody>
+                <tr class="ch-modeltop"><td class="ch-label" rowspan="6"><code>deepseek-v4-flash</code></td><td class="ch-label">enums</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">top-level oneOf</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-dropped">95%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">const union</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-invalid">0%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">$ref</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-invalid">0%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">if / then</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">prefixItems</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr class="ch-modeltop"><td class="ch-label" rowspan="6"><code>kimi-k2.6</code></td><td class="ch-label">enums</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td></tr>
+                <tr><td class="ch-label">top-level oneOf</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-rejected" title="request-time rejected 20/20 — the API refused the top-level oneOf schema">⊘ 0%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td></tr>
+                <tr><td class="ch-label">const union</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td></tr>
+                <tr><td class="ch-label">$ref</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td></tr>
+                <tr><td class="ch-label">if / then</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td></tr>
+                <tr><td class="ch-label">prefixItems</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-rejected" title="request-time rejected 20/20 — 'not a valid moonshot flavored json schema … items must be an object': the same endpoint gate kimi-k3 hits on Moonshot">⊘ 0%</td></tr>
+                <tr class="ch-modeltop"><td class="ch-label" rowspan="6"><code>kimi-k3</code></td><td class="ch-label">enums</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td></tr>
+                <tr><td class="ch-label">top-level oneOf</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td></tr>
+                <tr><td class="ch-label">const union</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored" title="19/19 served — 1 rate-limit error excluded">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td></tr>
+                <tr><td class="ch-label">$ref</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td></tr>
+                <tr><td class="ch-label">if / then</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td></tr>
+                <tr><td class="ch-label">prefixItems</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-rejected" title="request-time rejected 20/20 — 'not a valid moonshot flavored json schema … items must be an object' (the 2020-12 tuple form prefixItems + items:false)">⊘ 0%</td></tr>
+                <tr class="ch-modeltop"><td class="ch-label" rowspan="6"><code>glm-5.2</code></td><td class="ch-label">enums</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-ns" title="offered but did not reliably serve a forced tool call (excluded — see legend)">n/s</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-dropped">80%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">top-level oneOf</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-ns" title="offered but did not reliably serve a forced tool call (excluded — see legend)">n/s</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-invalid">0%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">const union</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-ns" title="offered but did not reliably serve a forced tool call (excluded — see legend)">n/s</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">$ref</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-rejected" title="request-time rejected 20/20 — the API refused the $ref/$defs schema">⊘ 0%</td><td class="ch-cell ch-ns" title="offered but did not reliably serve a forced tool call (excluded — see legend)">n/s</td><td class="ch-cell is-invalid" title="served, but invalid args 20/20 — the same cell fireworks-ai rejects at request time and zai-org serves-then-fails">0%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-invalid">0%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">if / then</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-ns" title="offered but did not reliably serve a forced tool call (excluded — see legend)">n/s</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">prefixItems</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-ns" title="offered but did not reliably serve a forced tool call (excluded — see legend)">n/s</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr class="ch-modeltop"><td class="ch-label" rowspan="6"><code>qwen3.6-35b</code></td><td class="ch-label">enums</td><td class="ch-cell is-dropped">90%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-dropped">75%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">top-level oneOf</td><td class="ch-cell is-invalid" title="invalid args 20/20 — the main grid's ✗">0%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-invalid" title="invalid args 20/20 — the failure follows the model">0%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">const union</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">$ref</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">if / then</td><td class="ch-cell is-dropped">95%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">prefixItems</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr class="ch-modeltop"><td class="ch-label" rowspan="6"><code>qwen3.5-397b</code></td><td class="ch-label">enums</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-rejected" title="request-time rejected 20/20 with an opaque 'invalid request error' — novita refuses all six schemas for this model (a blanket gate, not a keyword verdict)">⊘ 0%</td><td class="ch-cell is-dropped">95%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">top-level oneOf</td><td class="ch-cell is-invalid" title="invalid args on every served trial — cross-host re-run 17/17 (3 errors); the main grid's ✗ cell is 16/16 served (4 errors)">0%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-rejected" title="request-time rejected 20/20 (the blanket novita gate)">⊘ 0%</td><td class="ch-cell is-invalid" title="invalid args 16/16 served — the failure follows the model">0%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">const union</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-rejected" title="request-time rejected 20/20 (the blanket novita gate)">⊘ 0%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">$ref</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-rejected" title="request-time rejected 20/20 (the blanket novita gate)">⊘ 0%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">if / then</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-rejected" title="request-time rejected 20/20 (the blanket novita gate)">⊘ 0%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">prefixItems</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-rejected" title="request-time rejected 20/20 (the blanket novita gate)">⊘ 0%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr class="ch-modeltop"><td class="ch-label" rowspan="6"><code>minimax-m3</code></td><td class="ch-label">enums</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-dropped" title="11/20 honored, 9 dropped a required field">55%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">top-level oneOf</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-invalid" title="invalid args 19/19 served">0%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">const union</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-invalid" title="invalid args 20/20">0%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">$ref</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">if / then</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">prefixItems</td><td class="ch-cell is-invalid" title="invalid args 20/20 — the main grid's ✗; deepinfra is the only host where the tuple fails">0%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr class="ch-modeltop"><td class="ch-label" rowspan="6"><code>gpt-oss-120b</code></td><td class="ch-label">enums</td><td class="ch-cell is-invalid" title="invalid args 20/20 — the title-for-const swap behind the main grid's ✗">0%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-invalid" title="invalid args 17/17 served — the same title-for-const swap">0%</td><td class="ch-cell is-invalid" title="invalid args 15/15 served — the same title-for-const swap">0%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">top-level oneOf</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-rejected" title="request-time rejected 20/20 — the API refused the top-level oneOf schema">⊘ 0%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">const union</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">$ref</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-dropped">40%</td><td class="ch-cell is-dropped">60%</td><td class="ch-cell is-dropped">95%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">if / then</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-dropped" title="5/20 honored, 15 invalid">25%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+                <tr><td class="ch-label">prefixItems</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell is-honored">100%</td><td class="ch-cell ch-na" title="not offered by this provider">–</td><td class="ch-cell ch-na" title="not offered by this provider">–</td></tr>
+              </tbody>
+          </table>
+        </div>
+        <p class="results-legend">Honored-of-served %, 20 trials/cell. <strong>–</strong> means that the provider doesn't offer this model; <strong>n/s</strong> offered but did not reliably serve a forced tool call, so the pairing was excluded; <strong>⊘</strong> means that the provider's API refused the schema at request time.</p>
+
+        <h3>Are the highest-fidelity providers forcing conformance?</h3>
+        <p>I also tested whether Deepinfra's perfect score was a result of a constrained decoder forcing conformance rather than the model following the schema, by telling the model to break the schema and seeing if it would. Deepinfra lets models emit invalid output, so my conclusion is that the results do not reflect forced conformance by the model serving host. I ran the same check on Together, which was the only provider available for <code>inkling</code> at the time.</p>
+
+        <h3>Does coaching the prompt inflate the numbers?</h3>
+        <p>The prompts used in the results above hand the model already-conforming values, and one (<code>lookup-record</code>) also nudges the expected structure, so there was a chance that the results are measuring prompt-following rather than schema-reading. An 'uncoached' control re-phrasing each task naturally was run across 22 of the 24 models in the table (<code>claude-opus-4.8</code> and <code>inkling</code> have no uncoached rows).</p>
+        <p><strong>115 of 128</strong> comparable cells were identical between 'coached' vs 'uncoached', and <strong>15 of the 22 models</strong> didn't change results (four more changed by only one or two trials in one cell). In these cases, the perfect scores appear to be a result of the model reading the schema, not the prompt coaching the model.</p>
+        <p>The 13 cells that did change are below. Coaching appears to matter mainly where a weaker model meets a hard keyword (for example: <code>gemma-4-31b</code> couldn't handle a top-level <code>oneOf</code> without the hint, and <code>gpt-oss-120b</code> leaned on the coaching for <code>$ref</code>):</p>
+        <div class="results-grid-wrap">
+          <table class="results-grid crosshost-grid">
+              <thead><tr><th>Model</th><th>Keyword</th><th>Coached</th><th>Uncoached</th><th>&Delta;</th></tr></thead>
+              <tbody>
+                <tr><td class="ch-label"><code>gemma-4-31b</code></td><td class="ch-label">top-level oneOf</td><td class="ch-cell">65%</td><td class="ch-cell">0%</td><td class="ch-cell is-invalid">-65</td></tr>
+                <tr><td class="ch-label"><code>gpt-oss-120b</code></td><td class="ch-label">$ref</td><td class="ch-cell">65%</td><td class="ch-cell">30%</td><td class="ch-cell is-invalid">-35</td></tr>
+                <tr><td class="ch-label"><code>qwen3.6-35b</code></td><td class="ch-label">enums</td><td class="ch-cell">90%</td><td class="ch-cell">80%</td><td class="ch-cell is-invalid">-10</td></tr>
+                <tr><td class="ch-label"><code>glm-5.2</code></td><td class="ch-label">top-level oneOf</td><td class="ch-cell">100%</td><td class="ch-cell">90%</td><td class="ch-cell is-invalid">-10</td></tr>
+                <tr><td class="ch-label"><code>gpt-oss-120b</code></td><td class="ch-label">const union</td><td class="ch-cell">100%</td><td class="ch-cell">95%</td><td class="ch-cell is-dropped">-5</td></tr>
+                <tr><td class="ch-label"><code>gemma-4-31b</code></td><td class="ch-label">enums</td><td class="ch-cell">95%</td><td class="ch-cell">90%</td><td class="ch-cell is-dropped">-5</td></tr>
+                <tr><td class="ch-label"><code>kimi-k2.7-code</code></td><td class="ch-label">enums</td><td class="ch-cell">100%</td><td class="ch-cell">95%</td><td class="ch-cell is-dropped">-5</td></tr>
+                <tr><td class="ch-label"><code>kimi-k2.7-code</code></td><td class="ch-label">top-level oneOf</td><td class="ch-cell">100%</td><td class="ch-cell">95%</td><td class="ch-cell is-dropped">-5</td></tr>
+                <tr><td class="ch-label"><code>kimi-k2.7-code</code></td><td class="ch-label">const union</td><td class="ch-cell">95%</td><td class="ch-cell">100%</td><td class="ch-cell ch-na">+5</td></tr>
+                <tr><td class="ch-label"><code>gemini-3.1-pro</code></td><td class="ch-label">enums</td><td class="ch-cell">0%</td><td class="ch-cell">5%</td><td class="ch-cell ch-na">+5</td></tr>
+                <tr><td class="ch-label"><code>qwen3.5-397b</code></td><td class="ch-label">enums</td><td class="ch-cell">95%</td><td class="ch-cell">100%</td><td class="ch-cell ch-na">+5</td></tr>
+                <tr><td class="ch-label"><code>kimi-k2.7-code</code></td><td class="ch-label">$ref</td><td class="ch-cell">85%</td><td class="ch-cell">95%</td><td class="ch-cell ch-na">+10</td></tr>
+                <tr><td class="ch-label"><code>kimi-k2.7-code</code></td><td class="ch-label">prefixItems</td><td class="ch-cell">80%</td><td class="ch-cell">100%</td><td class="ch-cell ch-na">+20</td></tr>
+              </tbody>
+          </table>
+        </div>
+        <p class="results-legend">Percent of 'honored' out of 'served', coached vs uncoached (20 trials each). Negative &Delta; indicates that the model leaned on the coaching. The 115 unchanged cells and the 15 models with no changed cells aren't shown. A few cells (mostly <code>kimi-k2.7-code</code>) did slightly <em>better</em> uncoached, but each positive &Delta; is only 1&ndash;4 trials out of 20 (the 95% CI on a rate measured with 20 trials spans roughly &plusmn;15 points) and the sign flips both ways across that model's own cells. This appears consistent with sampling noise rather than a real "coaching hurts" effect.</p>
+
+        <h3>Full Results</h3>
+
+        <p class="muted">The full results are a Hugging Face-ready dataset
+          (<code>runs.jsonl</code> + <code>summary.csv</code> + <code>transport_diff.csv</code> + <code>cycle.csv</code>,
+          full provenance per record including the back-end that served each call).</p>
+        <div class="cluster" data-gap="xs">
+          <a class="button" href="https://github.com/olaservo/research-hub-public/blob/main/mcp/tool-schemas/data/dataset-card.md">Dataset card (GitHub)</a>
+          <a class="button" href="https://github.com/olaservo/research-hub-public/blob/main/mcp/tool-schemas/data/summary.csv">summary.csv</a>
+        </div>
+        <p class="muted">(<code>summary.csv</code> carries the first-class <code>honored_of_served</code> column with its served-based Wilson CI, plus the <code>accepted_pct</code> / <code>honored_given_accepted</code> gate-vs-skill split and an <code>underpowered</code> flag; the legacy <code>honored_rate</code> divides by all trials &mdash; see the dataset card for the conventions.)</p>
+        <p class="muted">Source, the Markdown write-ups, and the servers live on
+          <a href="https://github.com/olaservo/research-hub-public/tree/main/mcp/tool-schemas">GitHub</a>.
+          An independent survey of tool-call support across model providers is at
+          <a href="https://huggingface.co/spaces/evalstate/tool-research">evalstate/tool-research</a> by Shaun Smith.</p>
+      </section>
+
+      <section class="section stack" data-gap="md">
+        <div class="section-head"><h2>Try it</h2></div>
+        <article class="card stack" data-gap="sm">
+          <div class="card-head">
+            <div class="card-titles">
+              <h3 class="card-title">Interactive playground — coming soon</h3>
+            </div>
+          </div>
+          <p>An interactive playground is in the works: pick one of the six demo tools, fill its form, and
+            validate against its schema, with a panel showing how each model + provider handled that
+            <code>inputSchema</code>. It isn't published yet.</p>
+        </article>
+      </section>
+
+      <!-- Playground published-links section — restore when the playground ships.
+      <section class="section stack" data-gap="md">
+        <div class="section-head"><h2>Try it</h2></div>
+        <article class="card stack" data-gap="sm">
+          <div class="card-head">
+            <div class="card-titles">
+              <h3 class="card-title">Interactive playground</h3>
+            </div>
+          </div>
+          <p>Pick one of the six demo tools, fill its form, and validate against its schema. A model-results panel
+            then shows, from the static results dataset, how that model + provider handled
+            the <code>inputSchema</code>.</p>
+          <div class="cluster" data-gap="xs">
+            <a class="button" href="playground.html">Open playground</a>
+            <a class="button" href="https://github.com/olaservo/research-hub-public/blob/main/mcp/tool-schemas/playground.md">How it works (GitHub)</a>
+          </div>
+        </article>
+      </section>
+      -->
+
+      <p class="muted">By <a href="https://www.olahungerford.com/">Ola Hungerford</a></p>
+    </main>
+    <script src="../../assets/theme-switcher.js" defer></script>
+  </body>
+</html>
