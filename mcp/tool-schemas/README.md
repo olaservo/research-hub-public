@@ -1,6 +1,6 @@
 # Measuring tool input schema fidelity
 
-[SEP-2106](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/seps/2106-json-schema-2020-12.md) lets an MCP tool's `inputSchema` use the full **JSON Schema 2020-12** vocabulary — `oneOf`, `$ref` / `$defs`, `if` / `then`, `const` discriminators, 2020-12 tuples (`prefixItems`) — where before it only `type` / `properties` / `required` were legal. To see whether that capability survives contact with real inference stacks, six demo tools' verbatim schemas were handed to 24 models across their serving providers, 20 trials per cell.
+[SEP-2106](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/seps/2106-json-schema-2020-12.md), released as part of the 2026-07-28 MCP spec, allows the full JSON Schema 2020-12 schema dialect at the root of an MCP tool's `inputSchema`. To see whether the full vocabulary survives contact with real inference stacks, I handed six demo tools' verbatim schemas to 24 models across their serving providers.
 
 *Last updated 2026-08-03.*
 

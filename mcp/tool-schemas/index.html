@@ -121,13 +121,11 @@
         <p class="caption">Last updated <time datetime="2026-08-03">2026-08-03</time></p>
       </header>
 
-      <p class="lede"><a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/seps/2106-json-schema-2020-12.md">SEP-2106</a>
-        lets an MCP tool's <code>inputSchema</code> use the full <strong>JSON Schema 2020-12</strong>
-        vocabulary — <code>oneOf</code>, <code>$ref</code>/<code>$defs</code>, <code>if</code>/<code>then</code>,
-        <code>const</code> discriminators, 2020-12 tuples (<code>prefixItems</code>) — where before it only
-        <code>type</code> / <code>properties</code> / <code>required</code> were legal. To see whether that
-        capability survives contact with real inference stacks, six demo tools' verbatim schemas were handed
-        to 24 models across their serving providers, 20 trials per cell.</p>
+      <p class="lede"><a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/seps/2106-json-schema-2020-12.md">SEP-2106</a>,
+        released as part of the 2026-07-28 MCP spec, allows the full <strong>JSON Schema 2020-12</strong>
+        schema dialect at the root of an MCP tool's <code>inputSchema</code>. To see whether the full
+        vocabulary survives contact with real inference stacks, I handed six demo tools' verbatim schemas
+        to 24 models across their serving providers.</p>
 
       <section class="section stack" data-gap="md" id="glance">
         <div class="section-head"><h2>125 of 144 cells came back clean</h2></div>
