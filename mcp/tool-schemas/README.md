@@ -2,7 +2,7 @@
 
 [SEP-2106](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/seps/2106-json-schema-2020-12.md) lets an MCP tool's `inputSchema` use the full **JSON Schema 2020-12** vocabulary — `oneOf`, `$ref` / `$defs`, `if` / `then`, `const` discriminators, 2020-12 tuples (`prefixItems`) — where before it only `type` / `properties` / `required` were legal. To see whether that capability survives contact with real inference stacks, six demo tools' verbatim schemas were handed to 24 models across their serving providers, 20 trials per cell.
 
-*Last updated 2026-08-02.*
+*Last updated 2026-08-03.*
 
 ## The result at a glance: 125 of 144 cells came back clean
 
@@ -168,7 +168,9 @@ Every cell above is backed by a Hugging Face-ready dataset (`runs.jsonl` + `summ
 
 [Dataset card (GitHub)](https://github.com/olaservo/research-hub-public/blob/main/mcp/tool-schemas/data/dataset-card.md) · [summary.csv](https://github.com/olaservo/research-hub-public/blob/main/mcp/tool-schemas/data/summary.csv) (first-class `honored_of_served` with a served-based Wilson CI, plus the `accepted_pct` / `honored_given_accepted` gate-vs-skill split and an `underpowered` flag; the legacy `honored_rate` divides by all trials — see the dataset card for the conventions)
 
-Source, the Markdown write-ups, and the servers live on [GitHub](https://github.com/olaservo/research-hub-public/tree/main/mcp/tool-schemas). An independent survey of tool-call support across model providers is at [evalstate/tool-research](https://huggingface.co/spaces/evalstate/tool-research) by Shaun Smith.
+Source, the Markdown write-ups, and the servers live on [GitHub](https://github.com/olaservo/research-hub-public/tree/main/mcp/tool-schemas).
+
+A related independent study, the [Tool Schema Rendering Atlas](https://huggingface.co/spaces/evalstate/tool-research) by Shaun Smith (evalstate), measures an earlier stage of the same pipeline: it renders shared tool definitions through each open-weight model's own chat template and reports which schema keywords survive into the model-visible prompt text, with no hosted API in the loop. The two views can differ on the same model without disagreeing. A template may rewrite a construct rather than keep its keyword (Kimi's TypeScript renderer expresses `$ref` and unions as TypeScript types, so the keyword vanishes from the text while the constraint still reaches the model), and a keyword that renders verbatim can still be refused or fumbled once a serving endpoint sits in front of the model (the ⊘ gates and host-conditional cells in the results). The dataset's `cycle.csv` joins the two views per (model × tool) where the corpora overlap.
 
 ## Try it
 

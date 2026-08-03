@@ -118,7 +118,7 @@
       <header class="stack" data-gap="sm">
         <p class="muted"><a href="../../index.html">research-hub</a></p>
         <h1>Measuring tool input schema fidelity</h1>
-        <p class="caption">Last updated <time datetime="2026-08-02">2026-08-02</time></p>
+        <p class="caption">Last updated <time datetime="2026-08-03">2026-08-03</time></p>
       </header>
 
       <p class="lede"><a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/seps/2106-json-schema-2020-12.md">SEP-2106</a>
@@ -596,9 +596,18 @@
         </div>
         <p class="muted">(<code>summary.csv</code> carries the first-class <code>honored_of_served</code> column with its served-based Wilson CI, plus the <code>accepted_pct</code> / <code>honored_given_accepted</code> gate-vs-skill split and an <code>underpowered</code> flag; the legacy <code>honored_rate</code> divides by all trials &mdash; see the dataset card for the conventions.)</p>
         <p class="muted">Source, the Markdown write-ups, and the servers live on
-          <a href="https://github.com/olaservo/research-hub-public/tree/main/mcp/tool-schemas">GitHub</a>.
-          An independent survey of tool-call support across model providers is at
-          <a href="https://huggingface.co/spaces/evalstate/tool-research">evalstate/tool-research</a> by Shaun Smith.</p>
+          <a href="https://github.com/olaservo/research-hub-public/tree/main/mcp/tool-schemas">GitHub</a>.</p>
+        <p class="muted">A related independent study, the
+          <a href="https://huggingface.co/spaces/evalstate/tool-research">Tool Schema Rendering Atlas</a>
+          by Shaun Smith (evalstate), measures an earlier stage of the same pipeline: it renders shared tool
+          definitions through each open-weight model's own chat template and reports which schema keywords
+          survive into the model-visible prompt text, with no hosted API in the loop. The two views can differ
+          on the same model without disagreeing. A template may rewrite a construct rather than keep its
+          keyword (Kimi's TypeScript renderer expresses <code>$ref</code> and unions as TypeScript types, so
+          the keyword vanishes from the text while the constraint still reaches the model), and a keyword that
+          renders verbatim can still be refused or fumbled once a serving endpoint sits in front of the model
+          (the ⊘ gates and host-conditional cells above). The dataset's <code>cycle.csv</code> joins the two
+          views per (model × tool) where the corpora overlap.</p>
       </section>
 
       <section class="section stack" data-gap="md">
