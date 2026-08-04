@@ -65,10 +65,24 @@ body.theme-hypercard {
   /* sharp 1-bit rectangles everywhere; buttons get their round-rect back below */
   --radius-xs: 0; --radius-sm: 0; --radius-md: 0; --radius-lg: 0; --radius-xl: 0;
 
-  /* dithered "gray" desktop — the classic 50% Mac checkerboard, in pure CSS */
-  background-color: #ffffff;
+  /* the desktop itself is painted by body::before below, fixed to the
+     viewport — a scrolling 2px checkerboard strobes against the pixel grid.
+     body must stay transparent: <html> has its own background, so body's
+     background would otherwise paint over the negative-z-index layer. */
+  background: transparent;
+}
+
+/* dithered "gray" desktop — the classic 50% Mac checkerboard, in pure CSS.
+   Fixed to the viewport (like a real Mac desktop: the card scrolls, the
+   desktop doesn't), which kills the moiré flashing a moving dither causes. */
+body.theme-hypercard::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
   background-image: repeating-conic-gradient(#000 0 25%, #fff 0 50%);
   background-size: 4px 4px;
+  pointer-events: none;
 }
 
 /* the page itself is a white CARD on the desktop, with a hard drop shadow */

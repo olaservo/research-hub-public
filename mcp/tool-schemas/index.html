@@ -50,7 +50,7 @@
          (The clean-ring override is span-scoped so it never touches the
          exception links; the links just get their --xd forced to black.) */
       body.theme-hypercard span.xmap-dot { background: transparent; border: 1px solid #000; }
-      body.theme-hypercard a.xmap-dot { --xd: #000; }
+      body.theme-hypercard a.xmap-dot, body.theme-hypercard .finding-face { --xd: #000; }
       /* Tufte theme: clean dots fade into the paper; the gate takes the same
          mid gray as the tables' ⊘; dark red stays reserved for model failure. */
       body.theme-tufte span.xmap-dot { background: #d9d4c5; }
@@ -58,6 +58,10 @@
 
       /* ---- Layer 1: the finding cards ---- */
       .findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; align-items: start; }
+      /* each card leads with the face(s) its map dots wear; the verdict colour
+         rides the same xd-* classes as the map */
+      .finding-face { display: inline-flex; flex: none; width: 20px; height: 20px; }
+      .finding-face svg { display: block; width: 100%; height: 100%; color: var(--xd, #888); }
 
       /* ---- Layer 2: collapsed evidence sections ---- */
       .evidence details { border: 1px solid var(--border-soft, rgba(128,128,128,.25)); padding: 0 1rem; background: var(--surface, transparent); }
@@ -118,7 +122,7 @@
       <header class="stack" data-gap="sm">
         <p class="muted"><a href="../../index.html">research-hub</a></p>
         <h1>Measuring tool input schema fidelity</h1>
-        <p class="caption">Last updated <time datetime="2026-08-03">2026-08-03</time></p>
+        <p class="caption">Last updated <time datetime="2026-08-04">2026-08-04</time></p>
       </header>
 
       <p class="lede"><a href="https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/seps/2106-json-schema-2020-12.md">SEP-2106</a>,
@@ -128,14 +132,9 @@
         to 24 models across their serving providers.</p>
 
       <section class="section stack" data-gap="md" id="glance">
-        <div class="section-head"><h2>125 of 144 cells came back clean</h2></div>
-        <p>Each dot is one model on one keyword, pooling 20 trials. A small quiet dot means the model honored
-          the schema on every served trial. The 19 exceptions get a face, and how each trial went is how the
-          face feels: a <strong>frown</strong> is ✗ (served, tried, and produced invalid arguments on every
-          trial — the one verdict drawn in red), a <strong>flat mouth</strong> is a mixed n% result (got some
-          of them), and <strong>✗-eyes</strong> are ⊘ (knocked out at the gate — the provider's API refused
-          the schema before the model ever saw it, drawn in neutral gray because that verdict belongs to the
-          endpoint, not the model). Each face belongs to one of the five findings below.
+        <div class="section-head"><h2>The result at a glance</h2></div>
+        <p>Each dot is one model on one keyword, pooling 20 trials. A small dot means the model honored
+          the schema on every served trial.
           <strong>Hover any dot</strong> for the pair and its verdict; <strong>click a face</strong> to jump
           to its story.</p>
         <figure class="xmap-wrap">
@@ -327,25 +326,25 @@
       </section>
 
       <section class="section stack" data-gap="md" id="findings">
-        <div class="section-head"><h2>What the 19 exceptions say</h2></div>
+        <div class="section-head"><h2>What the exceptions represent</h2></div>
         <div class="findings">
           <article class="card stack" data-gap="sm" id="finding-gate">
-            <div class="card-head"><div class="card-titles"><h3 class="card-title">The gate, not the model</h3></div></div>
-            <p>Every ✗-eyed face on the map — a ⊘ in the tables — is a provider API refusing the schema at
-              request time: knocked out at the gate, the model never saw it. Anthropic's API and OpenAI's older
+            <div class="card-head"><span class="finding-face xd-rej" aria-hidden="true"><svg><use href="#xf-rej"/></svg></span><div class="card-titles"><h3 class="card-title">Schema refusals</h3></div></div>
+            <p>In some cases the schema was refused by the provider API at request time — these are the
+              ✗-eyed faces on the map, the ⊘ in the tables. Anthropic's API and OpenAI's older
               chat-completions endpoint both refuse a top-level <code>oneOf</code>; Moonshot's API refuses the
               2020-12 tuple form (<code>prefixItems</code> + <code>items: false</code>) with a validator error.
-              The sharpest proof is <code>kimi-k3</code>: the same model and the same schema is honored on every
-              trial via Together but refused outright by Moonshot's own endpoint. The knockout belongs to the
-              endpoint, not the model.</p>
+              This also varies by the serving host. In the case of <code>kimi-k3</code> the same model and the
+              same schema was honored on every trial via Together but refused outright by Moonshot's own
+              endpoint.</p>
             <p class="muted">Evidence: <a href="#evidence-main">main grid</a> ·
               <a href="#evidence-endpoints">chat-completions vs responses</a> ·
               <a href="#evidence-crosshost">cross-provider table</a></p>
           </article>
           <article class="card stack" data-gap="sm" id="finding-host">
-            <div class="card-head"><div class="card-titles"><h3 class="card-title">The verdict can belong to the host</h3></div></div>
-            <p>The measured unit for open models is <code>(model × serving host)</code>, and some failures follow
-              the host rather than the model. <code>minimax-m3</code>'s <code>prefixItems</code> fails only on
+            <div class="card-head"><span class="finding-face xd-inv" aria-hidden="true"><svg><use href="#xf-inv"/></svg></span><div class="card-titles"><h3 class="card-title">Serving host variance</h3></div></div>
+            <p>The measured unit for open models is <code>(model × serving host)</code>. Some failures can be
+              attributed to the host rather than the model. <code>minimax-m3</code>'s <code>prefixItems</code> fails only on
               deepinfra — fireworks-ai, novita, and together all serve it at 100% — and <code>gpt-oss-120b</code>'s
               enums failure reproduces on novita and scaleway but not on fireworks-ai or together. A break-the-schema
               control confirmed the perfect scores aren't a constrained decoder forcing conformance.</p>
@@ -353,7 +352,7 @@
               <a href="#evidence-conformance">forced-conformance check</a></p>
           </article>
           <article class="card stack" data-gap="sm" id="finding-gemini">
-            <div class="card-head"><div class="card-titles"><h3 class="card-title">Gemini reconstructs instead of reading</h3></div></div>
+            <div class="card-head"><span class="finding-face xd-inv" aria-hidden="true"><svg><use href="#xf-inv"/></svg></span><div class="card-titles"><h3 class="card-title">Reconstructing the schema vs reading it</h3></div></div>
             <p>Both Gemini 3.1 models use plain <code>enum</code> fields perfectly but return the display
               <em>title</em> instead of the <code>const</code> on <code>oneOf</code>/<code>anyOf</code> option
               fields. A follow-up probe shows branch consts don't survive Google's function-declaration path at
@@ -363,7 +362,7 @@
             <p class="muted">Evidence: <a href="#evidence-gemini">the title-vs-const decomposition</a></p>
           </article>
           <article class="card stack" data-gap="sm" id="finding-model">
-            <div class="card-head"><div class="card-titles"><h3 class="card-title">Sometimes it is just the model</h3></div></div>
+            <div class="card-head"><span class="finding-face xd-inv" aria-hidden="true"><svg><use href="#xf-inv"/></svg></span><span class="finding-face xd-mix" aria-hidden="true"><svg><use href="#xf-mix"/></svg></span><div class="card-titles"><h3 class="card-title">Sometimes it is just up to the model</h3></div></div>
             <p>The remaining exceptions are genuine model skill, concentrated where a weaker model meets a hard
               keyword. Both Qwens emit invalid arguments for a top-level <code>oneOf</code> on every host tried
               (the failure follows the model); <code>claude-haiku-4.5</code> fails the <code>const</code> union
@@ -377,7 +376,8 @@
             <div class="card-head"><div class="card-titles"><h3 class="card-title">Coaching only matters at the edges</h3></div></div>
             <p>The default prompts hand the model already-conforming values, so an uncoached control re-ran 22 of
               the 24 models with natural phrasing. 115 of 128 comparable cells were identical and 15 models didn't
-              change at all — the perfect scores come from reading the schema, not the prompt. But where a weak
+              change at all. This seems to indicate that the perfect scores come from reading the schema, and
+              not the prompt. But where a weak
               model meets a hard keyword, coaching props it up: <code>gemma-4-31b</code> drops from 65% to 0% on
               the top-level <code>oneOf</code>, <code>gpt-oss-120b</code> from 65% to 30% on <code>$ref</code>.
               Read the headline rates as upper bounds under favorable phrasing.</p>
